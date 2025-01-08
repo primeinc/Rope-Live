@@ -3063,9 +3063,11 @@ class GUI(tk.Tk):
         self.filter_target_media_with_current_filter_text()
 
         self.last_filenames = []
-        self.monitor_directory()
 
-    def monitor_directory(self):
+        user_loaded_new_directory = True
+        self.monitor_directory(user_loaded_new_directory)
+
+    def monitor_directory(self, user_loaded_new_directory = False):
 
         # Recursively read all media files from directory
         directory =  self.json_dict["source videos"]
@@ -3087,6 +3089,7 @@ class GUI(tk.Tk):
             
             for removed_file in removed_files:
                 self.remove_target_media_from_list(removed_file)
+                self.last_filenames.remove(removed_file)
 
         # Add new files and select the newest file
         if new_files:
@@ -3094,9 +3097,14 @@ class GUI(tk.Tk):
             # Sort new_files, newest creation time last
             new_files = sorted(new_files, key=lambda x: os.path.getctime(x))
         
-            # Create and extend buttons into button list
-            new_media_buttons = self.add_target_media_buttons(new_files)
-            self.target_media_buttons.extend(new_media_buttons)
+            for new_file in new_files:
+                # Create and extend buttons into button list
+                new_media_buttons = self.add_target_media_buttons([new_file])
+
+                if len(new_media_buttons) > 0:
+                    self.target_media_buttons.extend(new_media_buttons)
+                    self.last_filenames.append(new_file)
+
             self.all_target_media_thumbnails_generated = False
 
             # Filter based on search criteria
@@ -3112,15 +3120,17 @@ class GUI(tk.Tk):
 
             if has_visible_images:
 
+                # Sort alphabetically unless it's a subsequent monitor call
+                if user_loaded_new_directory:
+                    self.target_media_buttons = sorted(self.target_media_buttons, key=lambda x: x.media_file.lower())
+
                 # Redraw to show new items
                 self.redraw_target_media_canvas()
 
-                # Select last unfiltered target_media
-                self.select_adjacent_target_media(-1, 0)
-
-                # Sort alphabetically
-                # self.target_media_buttons = sorted(self.target_media_buttons, key=lambda x: x.media_file.lower())
-
+                # Select last unfiltered target_media if it's not the user asking for a new directory
+                if not user_loaded_new_directory:
+                    self.select_adjacent_target_media(-1, 0)
+                
         if new_files or removed_files:
             self.last_filenames = filenames
 
