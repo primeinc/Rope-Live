@@ -1830,6 +1830,7 @@ class GUI(tk.Tk):
     # Update the parameters or controls dicts and get a new frame
     def update_data(self, mode, name, use_markers=False):
         # print(inspect.currentframe().f_back.f_code.co_name,)
+        self.add_action('invalidate_video_cache')
         if mode=='parameter':
             self.parameters[name] = self.widget[name].get()
             self.add_action('parameters', self.parameters)
@@ -2977,6 +2978,7 @@ class GUI(tk.Tk):
                 self.update_source_faces_highlights(random_index)
 
         assign_embeddings_to_target_face()
+        self.add_action('invalidate_video_cache')
 
     def is_animated_gif(self, file):
         with open(file, 'rb') as f:

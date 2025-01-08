@@ -28,7 +28,8 @@ import psutil
 
 from rope.DFMModel import DFMModel
 from rope.Dicts import CAMERA_BACKENDS
-lock=threading.Lock()
+frame_number_lock = threading.Lock()
+process_qs_lock = threading.Lock()
 
 class VideoManager():
     def __init__(self, models ):
@@ -54,6 +55,11 @@ class VideoManager():
         self.create_video = False
         self.output_video = []
         self.file_name = []
+        self.use_video_cache = False
+        self.video_cache = {}
+        self.splash_image = cv2.cvtColor(cv2.imread('./rope/media/splash_next.png'), cv2.COLOR_BGR2RGB)
+        self.last_frame = None
+
 
         # Play related
         # self.set_read_threads = []          # Name of threaded function
@@ -169,6 +175,9 @@ class VideoManager():
                 self.capture.release()
             except:
                 pass
+        
+        self.invalidate_video_cache()
+        self.last_frame = None
 
         if self.control['VirtualCameraSwitch']:
             self.add_action("set_virtual_cam_toggle_disable",None)
@@ -450,6 +459,9 @@ class VideoManager():
                     index=idx
         return index, min_frame
 
+    def invalidate_video_cache(self):
+        self.video_cache = {}
+
     def is_animated_image(self):
         return self.file_name[1].lower() in [".gif", ".webp", ".png", ".apng", ".mjpeg"]
     
@@ -686,7 +698,7 @@ class VideoManager():
 
                     skip_frame = not self.record and self.current_frame % (self.get_current_frame_skip_value() + 1) != 0
                     if skip_frame:
-                        with lock:
+                        with frame_number_lock:
                             try:
                                 self.capture.grab() # Advance frame without decoding the image
                             except: 
@@ -694,12 +706,15 @@ class VideoManager():
                         self.current_frame += 1
                         continue
 
-                    item['Thread'] = threading.Thread(target=self.thread_video_read, args = [self.current_frame]).start()
-                    item['FrameNumber'] = self.current_frame
-                    item['Status'] = 'started'
-                    item['ThreadTime'] = time.time()
+                    with process_qs_lock:
+                        item['Thread'] = threading.Thread(target=self.thread_video_read, args = [self.current_frame])
 
-                    self.current_frame += 1
+                        item['FrameNumber'] = self.current_frame
+                        item['Status'] = 'started'
+                        item['ThreadTime'] = time.time()
+
+                        self.current_frame += 1
+                        item["Thread"].start()
                     break
 
         else:
@@ -716,8 +731,14 @@ class VideoManager():
             if index != -1:
                 if self.process_qs[index]['Status'] == 'finished':
                     processed_frame_number = self.process_qs[index]['FrameNumber']
+                    processed_frame = self.process_qs[index]['ProcessedFrame']
+                    processed_frame_valid = len(processed_frame) > 0
+                    if processed_frame_valid:
+                        self.last_frame = processed_frame
 
-                    temp = [self.process_qs[index]['ProcessedFrame'], processed_frame_number]
+                    new_frame = processed_frame if processed_frame_valid else self.last_frame if self.last_frame else self.splash_image
+
+                    temp = [new_frame, processed_frame_number]
                     self.frame_q.append(temp)
 
                     # Report fps, other data
@@ -745,7 +766,7 @@ class VideoManager():
                         action = self.control['AfterPlaybackTextSel']
 
                         if action == 'loop':
-                            with lock:
+                            with frame_number_lock:
                                 self.current_frame = 0
                                 self.play_video("play")
                         elif action == 'next':
@@ -834,57 +855,67 @@ class VideoManager():
     # @profile
     def thread_video_read(self, frame_number):
 
-        with lock:
-            try:
-                success, target_image = self.capture.read()
-
-                if success:
-                    target_image = cv2.cvtColor(target_image, cv2.COLOR_BGR2RGB)
-                else:
-                    raise ValueError("Failed to read frame with OpenCV")
-
-            except: 
-                # Fallback to using PIL
+        try:
+            with frame_number_lock:
                 try:
-                    self.capture.seek(frame_number)  # Seek to the desired frame number
-                    target_image = np.array(self.capture.convert("RGB"))  # Convert to NumPy array
-                except Exception as e:
-                    print("PIL failed:", e)
-                    return  # Exit if both methods fail
+                    success, target_image = self.capture.read()
 
-        if len(target_image) > 0:
+                    if success:
+                        target_image = cv2.cvtColor(target_image, cv2.COLOR_BGR2RGB)
+                    else:
+                        raise ValueError("Failed to read frame with OpenCV")
 
-            if self.parameters['ResolutionOverrideSwitch']:
+                except: 
+                    # Fallback to using PIL
+                    try:
+                        self.capture.seek(frame_number)  # Seek to the desired frame number
+                        target_image = np.array(self.capture.convert("RGB"))  # Convert to NumPy array
+                    except Exception as e:
+                        print("PIL failed:", e)
 
-                max_height = self.parameters['HeightOverrideSlider']
+            if len(target_image) > 0:
 
-                # Get the original dimensions
-                height, width = target_image.shape[:2]
+                if self.use_video_cache and len(self.video_cache) > 0 and frame_number in self.video_cache:
+                    
+                    temp = [self.video_cache[frame_number], frame_number]
+                else:
+                    if self.parameters['ResolutionOverrideSwitch']:
 
-                # Check if the frame height is greater than the maximum height
-                if height > max_height:
-                    # Calculate the scaling factor
-                    scale = max_height / height
-                    new_width = int(width * scale)
-                    new_height = max_height
-                    # Resize the frame
-                    target_image = cv2.resize(target_image, (new_width, new_height))
+                        max_height = self.parameters['HeightOverrideSlider']
 
-            if not self.control['SwapFacesButton'] and not self.control['EditFacesButton']:
-                temp = [target_image, frame_number]
+                        # Get the original dimensions
+                        height, width = target_image.shape[:2]
 
-            else:
-                temp = [self.swap_video(target_image, frame_number, True), frame_number]
+                        # Check if the frame height is greater than the maximum height
+                        if height > max_height:
+                            # Calculate the scaling factor
+                            scale = max_height / height
+                            new_width = int(width * scale)
+                            new_height = max_height
+                            # Resize the frame
+                            target_image = cv2.resize(target_image, (new_width, new_height))
 
-            if self.control['EnhanceFrameButton']:
-                temp[0] = self.enhance_video(temp[0], frame_number, True)
+                    if not self.control['SwapFacesButton'] and not self.control['EditFacesButton']:
+                        temp = [target_image, frame_number]
 
-        for item in self.process_qs:
-            if item['FrameNumber'] == frame_number:
-                item['ProcessedFrame'] = temp[0] if len(temp) > 0 else []
-                item['Status'] = 'finished' if len(temp) > 0 else 'clear'
-                item['ThreadTime'] = time.time() - item['ThreadTime']
-                break
+                    else:
+                        temp = [self.swap_video(target_image, frame_number, True), frame_number]
+
+                    if self.control['EnhanceFrameButton']:
+                        temp[0] = self.enhance_video(temp[0], frame_number, True)
+
+                    if self.use_video_cache:
+                        self.video_cache[frame_number] = temp[0]
+        except Exception as e: 
+            pass
+
+        with process_qs_lock:
+            for item in self.process_qs:
+                if item['FrameNumber'] == frame_number:
+                    item['Status'] = 'finished'
+                    item['ProcessedFrame'] = temp[0] if len(temp) > 0 else []
+                    item['ThreadTime'] = time.time() - item['ThreadTime']
+                    break
 
     def enhance_video(self, target_image, frame_number, use_markers):
         # Grab a local copy of the parameters to prevent threading issues
@@ -1602,7 +1633,7 @@ class VideoManager():
 
         # CLIPs
         if parameters["CLIPSwitch"]:
-            with lock:
+            with frame_number_lock:
                 mask = self.models.run_CLIPs(original_face_512, parameters["CLIPTextEntry"], parameters["CLIPSlider"])
             mask = t128(mask)
             swap_mask *= mask

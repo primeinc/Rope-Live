@@ -106,6 +106,10 @@ def coordinator():
             vm.parameters = action[0][1]
             action.pop(0)
 
+        elif action [0][0] == "invalidate_video_cache":
+            vm.invalidate_video_cache()
+            action.pop(0)
+
         # Face Editor
         elif action [0][0] == "parameters_face_editor":
             vm.parameters_face_editor = action[0][1]
