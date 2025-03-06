@@ -24,3 +24,4 @@ onnxsim
 kornia
 requests
 send2trash
+av
