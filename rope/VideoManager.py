@@ -1465,8 +1465,11 @@ class VideoManager():
             input_face_affined = v2.functional.affine(input_face_affined, 0, (0, 0), 1 + parameters['FaceScaleSlider'] / 100, 0, center=(dim*128/2, dim*128/2), interpolation=v2.InterpolationMode.BILINEAR)
 
         itex = 1
-        if parameters['StrengthSwitch']:
-            itex = ceil(parameters['StrengthSlider'] / 100.)
+        if parameters['StrengthTextSel'] != '100':
+            if parameters['StrengthTextSel'] == 'CUSTOM':
+                itex = ceil(parameters['StrengthSlider'] / 100.)
+            else:
+                itex = ceil(float(parameters['StrengthTextSel']) / 100.)
 
         if dfl_model:
             output_size = dfl_model._input_height
@@ -1545,11 +1548,15 @@ class VideoManager():
         output = output.permute(2, 0, 1)
         swap = t512(output)
 
-        if parameters['StrengthSwitch']:
+        if parameters['StrengthTextSel'] != '100':
             if itex == 0:
                 swap = original_face_512.clone()
             else:
-                alpha = np.mod(parameters['StrengthSlider'], 100)*0.01
+                strength_value = parameters['StrengthSlider']
+                if parameters['StrengthTextSel'] != 'CUSTOM':
+                    strength_value = float(parameters['StrengthTextSel'])
+
+                alpha = np.mod(strength_value, 100)*0.01
                 if alpha==0:
                     alpha=1
 

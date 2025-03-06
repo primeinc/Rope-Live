@@ -1348,9 +1348,9 @@ class GUI(tk.Tk):
 
         # Strength
         row = row + 1
-        self.widget['StrengthSwitch'] = GE.Switch2(self.layer['parameters_frame'], 'StrengthSwitch', 'Strength', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady)
+        self.widget['StrengthTextSel'] = GE.TextSelection(self.layer['parameters_frame'], 'StrengthTextSel', 'Swapper Strength', 3, self.update_data, 'parameter', 'parameter', 398, 20, row, 0, padx, pady, 0.72)
         row = row + 1
-        self.widget['StrengthSlider'] = GE.Slider2(self.layer['parameters_frame'], 'StrengthSlider', 'Amount', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
+        self.widget['StrengthSlider'] = GE.Slider2(self.layer['parameters_frame'], 'StrengthSlider', 'Custom Strength', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
 
         # Border
         row = row + 1
