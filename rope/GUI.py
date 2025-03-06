@@ -3150,9 +3150,10 @@ class GUI(tk.Tk):
             ".heif", ".heic", ".webp", ".pdf", ".ico", ".avif", ".exr"]
 
         file_count = len(filenames)
+        more_than_one = file_count > 1
         for i in range(file_count): # Does not include full path
             file = filenames[i]
-            if i % 100 == 0:
+            if more_than_one and i % 100 == 0:
                 print(f"Evaluating file {i + 1}/{file_count}")
             # Guess File type based on extension
             try:
