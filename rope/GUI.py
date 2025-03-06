@@ -747,7 +747,10 @@ class GUI(tk.Tk):
 
                         # Check if the widget has a 'frame' attribute, so can be reordered
                         if hasattr(self.widget[widget_name], 'frame'):
-                            self.widget[widget_name].frame.grid(row=row, column=column, padx=padx, pady=pady)
+                            self.widget[widget_name].frame.grid(
+                                row=self.widget[widget_name].row if hasattr(self.widget[widget_name], "row") else row, 
+                                column=self.widget[widget_name].column if hasattr(self.widget[widget_name], "column") else column, 
+                                padx=padx, pady=pady)
 
                         # Apply visibility setting
                         if not widget_value:
@@ -776,7 +779,10 @@ class GUI(tk.Tk):
 
                         # Check if the widget has a 'frame' attribute, so can be reordered
                         if hasattr(self.widget[widget_name], 'frame'):
-                            self.widget[widget_name].frame.grid(row=row, column=column, padx=padx, pady=pady)
+                            self.widget[widget_name].frame.grid(
+                                row=self.widget[widget_name].row if hasattr(self.widget[widget_name], "row") else row, 
+                                column=self.widget[widget_name].column if hasattr(self.widget[widget_name], "column") else column, 
+                                padx=padx, pady=pady)
 
                         # Apply visibility setting
                         if not widget_value:
