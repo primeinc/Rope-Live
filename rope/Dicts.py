@@ -258,6 +258,8 @@ DEFAULT_DATA = {
 'RestorerSwitchState':              False,
 'Restorer2SwitchInfoText':           'FACE RESTORER:\nRestore the swapped image by upscaling.',
 'Restorer2SwitchState':              False,
+'StrengthDefsTextEntry':    '',
+'StrengthDefsTextEntryInfoText':        'STRENGTH DEFINITIONS:\nTo use, type a list of strength values separated by commas (i.e. 25, 50, 75, 100) and press <enter>. 0, 100 and CUSTOM will be automatically added.',
 'StrengthTextSelInfoText':          'SWAPPER STRENGTH:\nApply additional swapping iterations to increase the strength of the result, which may increase likeness. Set to 0 to turn off swapping but allow the rest of the pipeline to apply to the original image.',
 'StrengthTextSelMode':              '100',
 'StrengthTextSelModes':             ['0', '25', '50', '75', '100', '125', '150', '175', '200', 'CUSTOM'],

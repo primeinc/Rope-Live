@@ -955,14 +955,25 @@ class TextSelection():
         # Loop through the parameter modes, create a label
         # Gotta find the size of the buttons according to the font
         self.font = tk.font.Font(family="Segoe UI", size=10, weight="normal")
+
+        self.set_modes(self.default_data[self.name+'Modes'])
+
+
+    def set_modes(self, modes : list):
+
+        # Clear existing labels
+        for label in self.textselect_label.values():
+            label.destroy()  # Remove label from UI
+        self.textselect_label.clear()
+
         x_spacing = self.text_width + 10
 
-        for mode in self.default_data[self.name+'Modes']:
+        for mode in modes:
             # Get size of text in pixels
             m_len = self.font.measure(mode)
 
             # Create a label with the text
-            self.textselect_label[mode] = tk.Label(self.frame, self.sel_off_style, text=mode, image=self.blank, compound='c', anchor='c', width=m_len, height=height)
+            self.textselect_label[mode] = tk.Label(self.frame, self.sel_off_style, text=mode, image=self.blank, compound='c', anchor='c', width=m_len, height=self.height)
             self.textselect_label[mode].place(x=x_spacing, y=0)
             self.textselect_label[mode].bind("<ButtonRelease-1>", lambda event, mode=mode: self.select_ui_text_selection(mode))
 
@@ -974,7 +985,7 @@ class TextSelection():
 
     def select_ui_text_selection(self, selection, request_frame=True):
         # Loop over all of the Modes
-        for mode in self.default_data[self.name+'Modes']:
+        for mode in self.textselect_label:
 
             # If the Mode has been selected
             if mode==selection:

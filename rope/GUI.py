@@ -1348,6 +1348,8 @@ class GUI(tk.Tk):
 
         # Strength
         row = row + 1
+        self.widget['StrengthDefsTextEntry'] = GE.Text_Entry(self.layer['parameters_frame'], 'StrengthDefsTextEntry', 'Strength Defs', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
+        row = row + 1
         self.widget['StrengthTextSel'] = GE.TextSelection(self.layer['parameters_frame'], 'StrengthTextSel', 'Swapper Strength', 3, self.update_data, 'parameter', 'parameter', 398, 20, row, 0, padx, pady, 0.72)
         row = row + 1
         self.widget['StrengthSlider'] = GE.Slider2(self.layer['parameters_frame'], 'StrengthSlider', 'Custom Strength', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
@@ -1871,6 +1873,8 @@ class GUI(tk.Tk):
                 self.models.set_number_of_threads(self.parameters[name])
             elif name=='ApplyFaceWeightsSwitch':
                 self.select_input_faces("same", "")
+            elif name=='StrengthDefsTextEntry':
+                self.update_strength_text_sel_modes()
             # Face Editor
             '''
             elif mode=='parameter_face_editor':
@@ -1886,6 +1890,43 @@ class GUI(tk.Tk):
             self.add_action('get_requested_video_frame', self.video_slider.get())
         else:
             self.add_action('get_requested_video_frame_without_markers', self.video_slider.get())
+
+        self.update_strength_text_sel_modes()
+
+    def update_strength_text_sel_modes(self):
+
+        modes = None
+
+        if "StrengthDefsTextEntry" in self.parameters and self.parameters["StrengthDefsTextEntry"]:
+            modes = self.parameters["StrengthDefsTextEntry"].split(",")
+        else:
+            modes = DEFAULT_DATA["StrengthTextSelModes"]
+
+        new_modes = []
+
+        for mode in modes:
+            try:
+                sanitized_mode = int(mode.strip())
+                if sanitized_mode not in new_modes:
+                    new_modes.append(sanitized_mode)
+            except:
+                continue
+
+        if new_modes:
+
+            if 0 not in new_modes:
+                new_modes.append(0)
+            if 100 not in new_modes:
+                new_modes.append(100)
+            
+            new_modes.sort()
+
+            new_modes = [str(x) for x in new_modes]
+
+            if "CUSTOM" not in new_modes:
+                new_modes.append("CUSTOM")
+
+            self.widget["StrengthTextSel"].set_modes(new_modes)
 
     def update_param_visibility(self, name, visible):
         if name in self.widget:
