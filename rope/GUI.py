@@ -3119,7 +3119,7 @@ class GUI(tk.Tk):
             self.filter_target_media_with_current_filter_text(redraw_canvas)
 
             has_visible_images = False
-            for button in new_media_buttons:
+            for button in self.target_media_buttons:
                 if button.visible:
                     has_visible_images = True
                     break
