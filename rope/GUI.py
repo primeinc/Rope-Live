@@ -3172,9 +3172,16 @@ class GUI(tk.Tk):
                 except OSError:
                     return None  # Return None for missing files
             
-            # Filter out files that no longer exist
-            valid_files = [f for f in new_files if safe_getctime(f) is not None]
-            new_files = sorted(valid_files, key=safe_getctime)
+            # Annotate files with their creation times to sort efficiently and safely.
+            # This is the Decorate-Sort-Undecorate pattern.
+            annotated_files = []
+            for f in new_files:
+                ctime = safe_getctime(f)
+                if ctime is not None:
+                    annotated_files.append((ctime, f))
+            
+            annotated_files.sort()  # Sorts by ctime, then by filename as a tie-breaker
+            new_files = [f for ctime, f in annotated_files]
         
             for new_file in new_files:
                 # Create and extend buttons into button list
