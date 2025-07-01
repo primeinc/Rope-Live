@@ -3162,14 +3162,19 @@ class GUI(tk.Tk):
         directory =  self.json_dict["source videos"]
         logger.debug(f"Monitoring directory: {directory}")
         
-        # Use helper method to safely scan directory
-        try:
-            filenames = self._scan_directory_safely(directory)
-            logger.debug(f"Found {len(filenames)} files in directory")
-        except (OSError, TypeError) as e:
-            # If the base directory doesn't exist or is inaccessible, use empty list
-            logger.warning(f"Cannot access base directory {directory}: {e}")
+        # Validate directory before scanning
+        if not directory or not isinstance(directory, str) or not directory.strip():
+            logger.debug("No valid directory specified for monitoring")
             filenames = []
+        else:
+            # Use helper method to safely scan directory
+            try:
+                filenames = self._scan_directory_safely(directory)
+                logger.debug(f"Found {len(filenames)} files in directory")
+            except (OSError, TypeError) as e:
+                # If the base directory doesn't exist or is inaccessible, use empty list
+                logger.warning(f"Cannot access base directory {directory}: {e}")
+                filenames = []
 
         # Convert both lists to sets
         set_filenames = set(filenames)
