@@ -3139,15 +3139,16 @@ class GUI(tk.Tk):
             # Get real path to detect symlink loops
             try:
                 real_dirpath = os.path.realpath(dirpath)
-                if real_dirpath in visited_dirs:
-                    dirnames[:] = []  # Don't recurse into this directory
-                    continue
-                visited_dirs.add(real_dirpath)
             except OSError as e:
                 # Skip directories we can't access
                 logger.debug(f"Cannot access directory {dirpath}: {e}")
                 dirnames[:] = []
                 continue
+
+            if real_dirpath in visited_dirs:
+                dirnames[:] = []  # Don't recurse into this directory
+                continue
+            visited_dirs.add(real_dirpath)
             
             # Collect all files from this directory
             for f in files:
