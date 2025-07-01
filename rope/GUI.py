@@ -3155,7 +3155,7 @@ class GUI(tk.Tk):
                 continue
             
             # Then check depth to prevent excessive recursion
-            current_depth = dirpath.count(os.path.sep)
+            current_depth = os.path.normpath(dirpath).count(os.path.sep)
             depth = current_depth - base_depth
             if depth > MAX_SCAN_DEPTH:
                 logger.info(f"Skipping deeply nested directory (depth={depth}): {dirpath}")
@@ -3234,7 +3234,7 @@ class GUI(tk.Tk):
                 try:
                     ctime = os.path.getctime(filepath)
                     file_times.append((ctime, filepath))
-                except OSError as e:
+                except (FileNotFoundError, PermissionError) as e:
                     # File disappeared or became inaccessible - this is expected in TOCTOU scenarios
                     logger.debug(f"Skipping inaccessible file {filepath}: {e}")
             
@@ -3249,7 +3249,7 @@ class GUI(tk.Tk):
                     if len(new_media_buttons) > 0:
                         self.target_media_buttons.extend(new_media_buttons)
                         self.last_filenames.append(new_file)
-                except Exception as e:
+                except OSError as e:
                     # File might have disappeared or become inaccessible (TOCTOU)
                     logger.info(f"Could not process file {new_file}: {e}")
 
