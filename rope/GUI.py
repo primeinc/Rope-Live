@@ -39,6 +39,9 @@ from rope.FaceEditor import FaceEditor
 from rope.Hovertip import RopeHovertip
 import gc
 
+# Module-level logger
+logger = logging.getLogger(__name__)
+
 def process_video(file):
 
     def resize_video(video_frame):
@@ -3130,7 +3133,7 @@ class GUI(tk.Tk):
         
         def onerror(error):
             """Handle errors during directory walk."""
-            logging.debug(f"Error accessing directory during walk: {error}")
+            logger.debug(f"Error accessing directory during walk: {error}")
         
         for dirpath, dirnames, files in os.walk(directory, followlinks=True, onerror=onerror):
             # Get real path to detect symlink loops
@@ -3142,7 +3145,7 @@ class GUI(tk.Tk):
                 visited_dirs.add(real_dirpath)
             except OSError as e:
                 # Skip directories we can't access
-                logging.debug(f"Cannot access directory {dirpath}: {e}")
+                logger.debug(f"Cannot access directory {dirpath}: {e}")
                 dirnames[:] = []
                 continue
             
@@ -3156,15 +3159,15 @@ class GUI(tk.Tk):
 
         # Recursively read all media files from directory
         directory =  self.json_dict["source videos"]
-        logging.debug(f"Monitoring directory: {directory}")
+        logger.debug(f"Monitoring directory: {directory}")
         
         # Use helper method to safely scan directory
         try:
             filenames = self._scan_directory_safely(directory)
-            logging.debug(f"Found {len(filenames)} files in directory")
-        except OSError as e:
+            logger.debug(f"Found {len(filenames)} files in directory")
+        except (OSError, TypeError) as e:
             # If the base directory doesn't exist or is inaccessible, use empty list
-            logging.debug(f"Cannot access base directory {directory}: {e}")
+            logger.warning(f"Cannot access base directory {directory}: {e}")
             filenames = []
 
         # Convert both lists to sets
@@ -3179,17 +3182,17 @@ class GUI(tk.Tk):
 
         # Remove files that were removed externally
         if removed_files:
-            logging.debug(f"Found {len(removed_files)} removed files")
+            logger.debug(f"Found {len(removed_files)} removed files")
             self.target_media_shuffle_history = set()
             
             for removed_file in removed_files:
-                logging.debug(f"Removing file from list: {removed_file}")
+                logger.debug(f"Removing file from list: {removed_file}")
                 self.remove_target_media_from_list(removed_file)
                 self.last_filenames.remove(removed_file)
 
         # Add new files and select the newest file
         if new_files:
-            logging.debug(f"Found {len(new_files)} new files")
+            logger.debug(f"Found {len(new_files)} new files")
 
             # Sort new_files, newest creation time last - handle TOCTOU race condition
             # Build annotated files list with creation times, filtering out inaccessible files
@@ -3200,7 +3203,7 @@ class GUI(tk.Tk):
                     annotated_files.append((ctime, f))
                 except OSError:
                     # Skip files we can't access
-                    logging.debug(f"Cannot get creation time for file {f}")
+                    logger.debug(f"Cannot get creation time for file {f}")
             
             # Sort by creation time and extract file paths in one step
             new_files = [f for ctime, f in sorted(annotated_files)]
