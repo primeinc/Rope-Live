@@ -3133,7 +3133,7 @@ class GUI(tk.Tk):
         """
         visited_dirs = set()
         filenames = []
-        base_depth = directory.count(os.path.sep)
+        base_depth = os.path.normpath(directory).count(os.path.sep)
         
         def onerror(error):
             """Handle errors during directory walk."""
