@@ -42,6 +42,9 @@ import gc
 # Module-level logger
 logger = logging.getLogger(__name__)
 
+# Constants
+MAX_SCAN_DEPTH = 20  # Maximum directory recursion depth to prevent stack overflow
+
 def process_video(file):
 
     def resize_video(video_frame):
@@ -3130,7 +3133,6 @@ class GUI(tk.Tk):
         """
         visited_dirs = set()
         filenames = []
-        max_depth = 20  # Prevent excessive recursion
         
         def onerror(error):
             """Handle errors during directory walk."""
@@ -3138,11 +3140,15 @@ class GUI(tk.Tk):
         
         for dirpath, dirnames, files in os.walk(directory, followlinks=True, onerror=onerror):
             # Check recursion depth
-            depth = dirpath[len(directory):].count(os.sep)
-            if depth > max_depth:
-                logger.info(f"Skipping deeply nested directory (>{max_depth} levels): {dirpath}")
-                dirnames[:] = []
-                continue
+            try:
+                depth = len(os.path.relpath(dirpath, directory).split(os.sep)) - 1
+                if depth > MAX_SCAN_DEPTH:
+                    logger.info(f"Skipping deeply nested directory (>{MAX_SCAN_DEPTH} levels): {dirpath}")
+                    dirnames[:] = []
+                    continue
+            except ValueError:
+                # Can happen if dirpath and directory are on different drives on Windows
+                pass
             # Get real path to detect symlink loops
             try:
                 real_dirpath = os.path.realpath(dirpath)
