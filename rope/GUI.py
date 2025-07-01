@@ -3126,68 +3126,82 @@ class GUI(tk.Tk):
         Safely scan directory for files, handling symlink loops and access errors.
         
         Args:
-            directory: Path to the directory to scan
+            directory: Path to the directory to scan (must be normalized)
             
         Returns:
             List of file paths found in the directory and subdirectories
         """
         visited_dirs = set()
         filenames = []
+        base_depth = directory.count(os.path.sep)
         
         def onerror(error):
             """Handle errors during directory walk."""
-            logger.debug(f"Error accessing directory during walk: {error}")
+            logger.debug(f"Error accessing path during walk: {error}")
         
         for dirpath, dirnames, files in os.walk(directory, followlinks=True, onerror=onerror):
-            # Check recursion depth
-            try:
-                depth = len(os.path.relpath(dirpath, directory).split(os.sep)) - 1
-                if depth > MAX_SCAN_DEPTH:
-                    logger.info(f"Skipping deeply nested directory (>{MAX_SCAN_DEPTH} levels): {dirpath}")
-                    dirnames[:] = []
-                    continue
-            except ValueError:
-                # Can happen if dirpath and directory are on different drives on Windows
-                pass
-            # Get real path to detect symlink loops
+            # First, check symlink loops using real path
             try:
                 real_dirpath = os.path.realpath(dirpath)
+                if real_dirpath in visited_dirs:
+                    logger.debug(f"Skipping symlink loop: {dirpath} -> {real_dirpath}")
+                    dirnames[:] = []  # Don't recurse into this directory
+                    continue
+                visited_dirs.add(real_dirpath)
             except OSError as e:
-                # Skip directories we can't access
-                logger.debug(f"Cannot access directory {dirpath}: {e}")
+                # Can't resolve real path, skip this directory
+                logger.debug(f"Cannot resolve real path for {dirpath}: {e}")
                 dirnames[:] = []
                 continue
-
-            if real_dirpath in visited_dirs:
-                dirnames[:] = []  # Don't recurse into this directory
+            
+            # Then check depth to prevent excessive recursion
+            current_depth = dirpath.count(os.path.sep)
+            depth = current_depth - base_depth
+            if depth > MAX_SCAN_DEPTH:
+                logger.info(f"Skipping deeply nested directory (depth={depth}): {dirpath}")
+                dirnames[:] = []
                 continue
-            visited_dirs.add(real_dirpath)
             
             # Collect all files from this directory
             for f in files:
-                filenames.append(os.path.join(dirpath, f))
+                filepath = os.path.join(dirpath, f)
+                filenames.append(filepath)
                 
         return filenames
 
     def monitor_directory(self, user_loaded_new_directory = False):
-
-        # Recursively read all media files from directory
-        directory =  self.json_dict["source videos"]
-        logger.debug(f"Monitoring directory: {directory}")
+        """
+        Monitor directory for changes and update UI accordingly.
+        Thread-safety note: This method modifies shared state and should not be called concurrently.
+        """
+        # Get directory from config
+        directory = self.json_dict["source videos"]
+        logger.debug(f"Monitor directory called with: {directory}")
         
-        # Validate directory before scanning
+        # Validate and normalize directory
         if not directory or not isinstance(directory, str) or not directory.strip():
             logger.debug("No valid directory specified for monitoring")
             filenames = []
         else:
-            # Use helper method to safely scan directory
-            try:
-                filenames = self._scan_directory_safely(directory)
-                logger.debug(f"Found {len(filenames)} files in directory")
-            except (OSError, TypeError) as e:
-                # If the base directory doesn't exist or is inaccessible, use empty list
-                logger.warning(f"Cannot access base directory {directory}: {e}")
+            # Normalize path: strip whitespace, resolve . and .., remove trailing slashes
+            directory = os.path.normpath(directory.strip())
+            
+            # Check if path exists and is a directory
+            if not os.path.exists(directory):
+                logger.info(f"Directory does not exist: {directory}")
                 filenames = []
+            elif not os.path.isdir(directory):
+                logger.warning(f"Path exists but is not a directory: {directory}")
+                filenames = []
+            else:
+                # Directory is valid, scan it
+                try:
+                    filenames = self._scan_directory_safely(directory)
+                    logger.debug(f"Found {len(filenames)} files in directory")
+                except Exception as e:
+                    # Catch any unexpected errors
+                    logger.error(f"Unexpected error scanning directory {directory}: {e}", exc_info=True)
+                    filenames = []
 
         # Convert both lists to sets
         set_filenames = set(filenames)
@@ -3213,19 +3227,20 @@ class GUI(tk.Tk):
         if new_files:
             logger.debug(f"Found {len(new_files)} new files")
 
-            # Sort new_files, newest creation time last - handle TOCTOU race condition
-            # Build annotated files list with creation times, filtering out inaccessible files
-            annotated_files = []
-            for f in new_files:
+            # Sort new_files by creation time (newest last), handling TOCTOU race conditions
+            # Step 1: Get creation times for all files, filtering out inaccessible ones
+            file_times = []
+            for filepath in new_files:
                 try:
-                    ctime = os.path.getctime(f)
-                    annotated_files.append((ctime, f))
-                except OSError:
-                    # Skip files we can't access
-                    logger.debug(f"Cannot get creation time for file {f}")
+                    ctime = os.path.getctime(filepath)
+                    file_times.append((ctime, filepath))
+                except OSError as e:
+                    # File disappeared or became inaccessible - this is expected in TOCTOU scenarios
+                    logger.debug(f"Skipping inaccessible file {filepath}: {e}")
             
-            # Sort by creation time and extract file paths in one step
-            new_files = [f for ctime, f in sorted(annotated_files)]
+            # Step 2: Sort by creation time and extract just the file paths
+            file_times.sort(key=lambda x: x[0])  # Sort by ctime
+            new_files = [filepath for ctime, filepath in file_times]
         
             for new_file in new_files:
                 # Create and extend buttons into button list
@@ -3234,8 +3249,9 @@ class GUI(tk.Tk):
                     if len(new_media_buttons) > 0:
                         self.target_media_buttons.extend(new_media_buttons)
                         self.last_filenames.append(new_file)
-                except (OSError, IOError) as e:
-                    logger.info(f"File disappeared before processing: {new_file} - {e}")
+                except Exception as e:
+                    # File might have disappeared or become inaccessible (TOCTOU)
+                    logger.info(f"Could not process file {new_file}: {e}")
 
             self.all_target_media_thumbnails_generated = False
 
