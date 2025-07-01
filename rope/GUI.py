@@ -3,6 +3,7 @@ import shutil
 import traceback
 import cv2
 import tkinter as tk
+import logging
 from tkinter import filedialog, font
 import numpy as np
 from PIL import Image, ImageTk, ImageSequence, PngImagePlugin
@@ -3114,34 +3115,56 @@ class GUI(tk.Tk):
         user_loaded_new_directory = True
         self.monitor_directory(user_loaded_new_directory)
 
+    def _scan_directory_safely(self, directory):
+        """
+        Safely scan directory for files, handling symlink loops and access errors.
+        
+        Args:
+            directory: Path to the directory to scan
+            
+        Returns:
+            List of file paths found in the directory and subdirectories
+        """
+        visited_dirs = set()
+        filenames = []
+        
+        def onerror(error):
+            """Handle errors during directory walk."""
+            logging.debug(f"Error accessing directory during walk: {error}")
+        
+        for dirpath, dirnames, files in os.walk(directory, followlinks=True, onerror=onerror):
+            # Get real path to detect symlink loops
+            try:
+                real_dirpath = os.path.realpath(dirpath)
+                if real_dirpath in visited_dirs:
+                    dirnames[:] = []  # Don't recurse into this directory
+                    continue
+                visited_dirs.add(real_dirpath)
+            except OSError as e:
+                # Skip directories we can't access
+                logging.debug(f"Cannot access directory {dirpath}: {e}")
+                dirnames[:] = []
+                continue
+            
+            # Collect all files from this directory
+            for f in files:
+                filenames.append(os.path.join(dirpath, f))
+                
+        return filenames
+
     def monitor_directory(self, user_loaded_new_directory = False):
 
         # Recursively read all media files from directory
         directory =  self.json_dict["source videos"]
+        logging.debug(f"Monitoring directory: {directory}")
         
-        # Track visited directories to prevent symlink loops
-        visited_dirs = set()
-        filenames = []
-        
+        # Use helper method to safely scan directory
         try:
-            for dirpath, dirnames, files in os.walk(directory, followlinks=True):
-                # Get real path to detect symlink loops
-                try:
-                    real_dirpath = os.path.realpath(dirpath)
-                    if real_dirpath in visited_dirs:
-                        dirnames[:] = []  # Don't recurse into this directory
-                        continue
-                    visited_dirs.add(real_dirpath)
-                except OSError:
-                    # Skip directories we can't access
-                    dirnames[:] = []
-                    continue
-                
-                # Collect all files from this directory
-                for f in files:
-                    filenames.append(os.path.join(dirpath, f))
-        except OSError:
+            filenames = self._scan_directory_safely(directory)
+            logging.debug(f"Found {len(filenames)} files in directory")
+        except OSError as e:
             # If the base directory doesn't exist or is inaccessible, use empty list
+            logging.debug(f"Cannot access base directory {directory}: {e}")
             filenames = []
 
         # Convert both lists to sets
@@ -3156,32 +3179,31 @@ class GUI(tk.Tk):
 
         # Remove files that were removed externally
         if removed_files:
+            logging.debug(f"Found {len(removed_files)} removed files")
             self.target_media_shuffle_history = set()
             
             for removed_file in removed_files:
+                logging.debug(f"Removing file from list: {removed_file}")
                 self.remove_target_media_from_list(removed_file)
                 self.last_filenames.remove(removed_file)
 
         # Add new files and select the newest file
         if new_files:
+            logging.debug(f"Found {len(new_files)} new files")
 
             # Sort new_files, newest creation time last - handle TOCTOU race condition
-            def safe_getctime(path):
-                try:
-                    return os.path.getctime(path)
-                except OSError:
-                    return None  # Return None for missing files
-            
-            # Annotate files with their creation times to sort efficiently and safely.
-            # This is the Decorate-Sort-Undecorate pattern.
+            # Build annotated files list with creation times, filtering out inaccessible files
             annotated_files = []
             for f in new_files:
-                ctime = safe_getctime(f)
-                if ctime is not None:
+                try:
+                    ctime = os.path.getctime(f)
                     annotated_files.append((ctime, f))
+                except OSError:
+                    # Skip files we can't access
+                    logging.debug(f"Cannot get creation time for file {f}")
             
-            annotated_files.sort()  # Sorts by ctime, then by filename as a tie-breaker
-            new_files = [f for ctime, f in annotated_files]
+            # Sort by creation time and extract file paths in one step
+            new_files = [f for ctime, f in sorted(annotated_files)]
         
             for new_file in new_files:
                 # Create and extend buttons into button list
