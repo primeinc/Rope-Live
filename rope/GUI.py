@@ -3130,12 +3130,19 @@ class GUI(tk.Tk):
         """
         visited_dirs = set()
         filenames = []
+        max_depth = 20  # Prevent excessive recursion
         
         def onerror(error):
             """Handle errors during directory walk."""
             logger.debug(f"Error accessing directory during walk: {error}")
         
         for dirpath, dirnames, files in os.walk(directory, followlinks=True, onerror=onerror):
+            # Check recursion depth
+            depth = dirpath[len(directory):].count(os.sep)
+            if depth > max_depth:
+                logger.info(f"Skipping deeply nested directory (>{max_depth} levels): {dirpath}")
+                dirnames[:] = []
+                continue
             # Get real path to detect symlink loops
             try:
                 real_dirpath = os.path.realpath(dirpath)
@@ -3216,11 +3223,13 @@ class GUI(tk.Tk):
         
             for new_file in new_files:
                 # Create and extend buttons into button list
-                new_media_buttons = self.add_target_media_buttons([new_file])
-
-                if len(new_media_buttons) > 0:
-                    self.target_media_buttons.extend(new_media_buttons)
-                    self.last_filenames.append(new_file)
+                try:
+                    new_media_buttons = self.add_target_media_buttons([new_file])
+                    if len(new_media_buttons) > 0:
+                        self.target_media_buttons.extend(new_media_buttons)
+                        self.last_filenames.append(new_file)
+                except (OSError, IOError) as e:
+                    logger.info(f"File disappeared before processing: {new_file} - {e}")
 
             self.all_target_media_thumbnails_generated = False
 
