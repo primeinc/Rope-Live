@@ -3118,7 +3118,31 @@ class GUI(tk.Tk):
 
         # Recursively read all media files from directory
         directory =  self.json_dict["source videos"]
-        filenames = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk(directory, followlinks=True) for f in filenames]
+        
+        # Track visited directories to prevent symlink loops
+        visited_dirs = set()
+        filenames = []
+        
+        try:
+            for dirpath, dirnames, files in os.walk(directory, followlinks=True):
+                # Get real path to detect symlink loops
+                try:
+                    real_dirpath = os.path.realpath(dirpath)
+                    if real_dirpath in visited_dirs:
+                        dirnames[:] = []  # Don't recurse into this directory
+                        continue
+                    visited_dirs.add(real_dirpath)
+                except (OSError, IOError):
+                    # Skip directories we can't access
+                    dirnames[:] = []
+                    continue
+                
+                # Collect all files from this directory
+                for f in files:
+                    filenames.append(os.path.join(dirpath, f))
+        except (OSError, IOError):
+            # If the base directory doesn't exist or is inaccessible, use empty list
+            filenames = []
 
         # Convert both lists to sets
         set_filenames = set(filenames)
@@ -3141,8 +3165,14 @@ class GUI(tk.Tk):
         # Add new files and select the newest file
         if new_files:
 
-            # Sort new_files, newest creation time last
-            new_files = sorted(new_files, key=lambda x: os.path.getctime(x))
+            # Sort new_files, newest creation time last - handle TOCTOU race condition
+            def safe_getctime(path):
+                try:
+                    return os.path.getctime(path)
+                except (OSError, IOError):
+                    return 0  # Return epoch time for missing files
+            
+            new_files = sorted(new_files, key=safe_getctime)
         
             for new_file in new_files:
                 # Create and extend buttons into button list
