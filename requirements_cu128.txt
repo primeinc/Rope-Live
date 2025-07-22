@@ -1,0 +1,67 @@
+--index-url https://download.pytorch.org/whl/cu128
+--extra-index-url https://pypi.nvidia.com
+--extra-index-url https://pypi.org/simple
+
+# Core compute + PyTorch (CUDA 12.8)
+torch==2.7.1
+torchvision==0.22.1
+torchaudio==2.7.1
+
+# TensorRT (pip pip-release cu12 package)
+tensorrt-cu12==10.12.0.36
+
+# CUDA runtime loader
+# nvidia-cuda-runtime-cu12==12.8.*
+# nvidia-cudnn-cu12==9.11.0.98
+
+# ONNX + runtime
+onnx==1.18.0
+onnxruntime-gpu==1.22.0
+onnxsim
+protobuf==4.25.8
+# flatbuffers==25.1.24
+
+# Vision & imaging
+numpy==1.26.4
+opencv-python==4.10.0.84
+scikit-image==0.21.0
+Pillow==9.5.0
+# PyWavelets==1.8.0
+# imageio==2.37.0
+# tifffile==2025.1.10
+kornia
+# kornia_rs==0.1.8
+
+# Math & arrays
+numexpr
+# scipy==1.15.1
+# mpmath==1.3.0
+# sympy==1.13.3
+
+# Utilities
+tqdm
+ftfy
+regex
+packaging==24.1
+psutil==6.0.0
+requests
+# send2trash==1.8.3
+# av==14.4.0
+# watchdog==4.0.1
+# typing_extensions==4.12.2
+wheel==0.45.1
+
+# UI / dev tools
+customtkinter
+tk==0.1.0
+pyvirtualcam==0.11.1
+# Jinja2==3.1.5
+# darkdetect==0.8.0
+# rich==13.9.4
+# Pygments==2.19.1
+# coloredlogs==15.0.1
+# humanfriendly==10.0
+# lazy_loader==0.4
+# markdown-it-py==3.0.0
+# mdurl==0.1.2
+# networkx==3.4.2

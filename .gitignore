@@ -17,10 +17,9 @@ merged_embeddings*.txt
 *.sln
 *.pyproj
 .vscode/
-tensorrt-engines
-tensorrt-engines-cu118/
-tensorrt-engines-cu124/
-Rope-cu118.bat
-Rope-cu124.bat
+tensorrt-engines/
+tensorrt-engines-cu*/
+venv_cu*/
+ext_dependencies/
+.specstory
 *.bak
-*.orig_bak
