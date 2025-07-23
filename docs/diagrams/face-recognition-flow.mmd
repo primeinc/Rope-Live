@@ -1,0 +1,131 @@
+```mermaid
+flowchart TB
+    Start([run_recognize Called]) --> ParseInputs[["Parse Inputs:
+    • Image tensor
+    • Face keypoints (5-point)
+    • Similarity type
+    • Face swapper model"]]
+    
+    ParseInputs --> SelectModel{Select Recognition Model}
+    
+    SelectModel -->|Inswapper128| LoadArcFace[Load w600k_r50.onnx]
+    SelectModel -->|SimSwap512| LoadSimSwap[Load simswap_arcface_model.onnx]
+    SelectModel -->|GhostFace| LoadGhost[Load ghost_arcface_backbone.onnx]
+    
+    LoadArcFace --> CallRecognize[recognize()]
+    LoadSimSwap --> CallRecognize
+    LoadGhost --> CallRecognize
+    
+    CallRecognize --> SelectAlignment{Select Alignment Type}
+    
+    SelectAlignment -->|Optimal| OptimalAlign[["Optimal Alignment:
+    • warp_face_by_face_landmark_5()
+    • Best quality alignment
+    • arcfacemap mode
+    • Bilinear interpolation"]]
+    
+    SelectAlignment -->|Pearl| PearlAlign[["Pearl Alignment:
+    • Modified arcface_dst
+    • Add 8.0 offset to X coords
+    • SimilarityTransform
+    • Custom affine transform"]]
+    
+    SelectAlignment -->|Default| DefaultAlign[["Default Alignment:
+    • Standard arcface_dst
+    • SimilarityTransform
+    • Basic affine transform"]]
+    
+    OptimalAlign --> TransformFace
+    PearlAlign --> TransformFace
+    DefaultAlign --> TransformFace
+    
+    TransformFace[["Transform Face:
+    • Apply rotation
+    • Apply translation
+    • Apply scaling
+    • Crop to 112x112"]]
+    
+    TransformFace --> CheckModelType{Model Type?}
+    
+    CheckModelType -->|ArcFace/SimSwap| PrepareArcFace[["Prepare for ArcFace:
+    • Permute to HWC (112,112,3)
+    • Convert BGR order
+    • Normalize: (pixel - 127.5) / 127.5
+    • Permute back to CHW"]]
+    
+    CheckModelType -->|GhostFace| PrepareGhost[["Prepare for GhostFace:
+    • Permute to HWC
+    • Convert to float32
+    • Normalize: pixel / 127.5 - 1"]]
+    
+    PrepareArcFace --> RunInference
+    PrepareGhost --> RunInference
+    
+    RunInference[["Run Model Inference:
+    • Prepare input tensor
+    • Bind to CUDA device
+    • Execute model
+    • Get output embedding"]]
+    
+    RunInference --> ProcessOutput[["Process Output:
+    • Extract 512-dim embedding
+    • Normalize if needed
+    • Store cropped image"]]
+    
+    ProcessOutput --> ReturnResults[["Return:
+    • Face embedding (512-dim)
+    • Cropped face image (112x112)"]]
+    
+    ReturnResults --> End([Recognition Complete])
+    
+    style Start fill:#e1f5fe
+    style End fill:#c8e6c9
+    style SelectModel fill:#fff9c4
+    style SelectAlignment fill:#fff9c4
+    style CheckModelType fill:#ffccbc
+```
+
+## Face Recognition Process Flow
+
+This diagram shows how face embeddings are extracted from detected faces.
+
+### Key Components:
+
+1. **Model Selection**:
+   - **Inswapper128**: Uses ArcFace (w600k_r50.onnx)
+   - **SimSwap512**: Uses SimSwap's ArcFace variant
+   - **GhostFace**: Uses GhostFace backbone
+
+2. **Alignment Methods**:
+   - **Optimal**: High-quality warping using facial landmarks
+   - **Pearl**: Modified alignment with coordinate offset
+   - **Default**: Standard ArcFace alignment
+
+3. **Face Transformation**:
+   - Aligns face using 5-point landmarks
+   - Transforms to canonical position
+   - Crops and resizes to 112x112 pixels
+
+4. **Normalization**:
+   - Different models require different preprocessing
+   - ArcFace/SimSwap: BGR order, specific normalization
+   - GhostFace: Different normalization scheme
+
+5. **Embedding Extraction**:
+   - All models output 512-dimensional vectors
+   - Represents facial identity features
+   - Used for similarity comparison
+
+### Technical Details:
+
+- **Input**: Face region with 5-point landmarks
+- **Output**: 512-dimensional embedding + cropped face
+- **Face Size**: Standardized to 112x112 pixels
+- **Normalization**: Model-specific preprocessing
+- **Device**: CUDA acceleration when available
+
+### Parameters Affecting Recognition:
+
+- **SimilarityTypeTextSel**: Chooses alignment algorithm
+- **FaceSwapperModelTextSel**: Selects recognition model
+- These parameters significantly affect embedding quality and matching accuracy

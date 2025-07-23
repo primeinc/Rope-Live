@@ -1,0 +1,97 @@
+```mermaid
+flowchart TB
+    Start([User Clicks Find Faces Button]) --> CheckAutoSwap{Check AutoSwap State}
+    
+    CheckAutoSwap -->|AutoSwap ON| ClearFaces[Clear Target Faces]
+    CheckAutoSwap -->|AutoSwap OFF| FindFaces[find_faces()]
+    
+    ClearFaces --> AutoSwap[auto_swap()]
+    AutoSwap --> FindFaces
+    
+    FindFaces --> PrepareImage[Prepare Image]
+    PrepareImage --> ConvertTensor[Convert to PyTorch Tensor]
+    ConvertTensor --> RemoveAlpha{Has Alpha Channel?}
+    RemoveAlpha -->|Yes| StripAlpha[Remove Alpha Channel]
+    RemoveAlpha -->|No| PermuteImage
+    StripAlpha --> PermuteImage[Permute Dimensions HWC→CHW]
+    
+    PermuteImage --> CheckRotation{Auto Rotation Enabled?}
+    CheckRotation -->|Yes| SetRotations[Set Rotations: 0°, 90°, 180°, 270°]
+    CheckRotation -->|No| NoRotation[Set Rotation: 0° only]
+    
+    SetRotations --> RunDetect
+    NoRotation --> RunDetect[run_detect()]
+    
+    RunDetect --> SelectModel{Select Detection Model}
+    SelectModel -->|Retinaface| LoadRetinaface[Load det_10g.onnx]
+    SelectModel -->|SCRDF| LoadSCRDF[Load scrfd_2.5g_bnkps.onnx]
+    SelectModel -->|Yolov8| LoadYolo[Load yoloface_8n.onnx]
+    SelectModel -->|Yunet| LoadYunet[Load yunet_n_640_640.onnx]
+    
+    LoadRetinaface --> DetectFaces
+    LoadSCRDF --> DetectFaces
+    LoadYolo --> DetectFaces
+    LoadYunet --> DetectFaces
+    
+    DetectFaces[Detect Faces with Score Threshold] --> GetBBoxes[Get Bounding Boxes & Landmarks]
+    
+    GetBBoxes --> ForEachFace{For Each Detected Face}
+    ForEachFace --> RunRecognize[run_recognize()]
+    
+    RunRecognize --> AlignFace[Align Face with Landmarks]
+    AlignFace --> ExtractEmbedding[Extract 512-dim Embedding]
+    ExtractEmbedding --> CropImage[Get Cropped Face Image]
+    
+    CropImage --> CheckExisting{Check Against Existing Faces}
+    CheckExisting --> CalcSimilarity[Calculate Cosine Similarity]
+    
+    CalcSimilarity --> CompareThreshold{Similarity >= Threshold?}
+    CompareThreshold -->|Yes| FoundMatch[Mark as Existing Face]
+    CompareThreshold -->|No| NewFace[Add as New Face]
+    
+    FoundMatch --> NextFace{More Faces?}
+    NewFace --> CreateButton[Create UI Button]
+    CreateButton --> AddToCanvas[Add to Found Faces Canvas]
+    AddToCanvas --> NextFace
+    
+    NextFace -->|Yes| ForEachFace
+    NextFace -->|No| UpdateDisplay[Update Canvas Display]
+    
+    UpdateDisplay --> End([Face Finding Complete])
+    
+    style Start fill:#e1f5fe
+    style End fill:#c8e6c9
+    style CheckAutoSwap fill:#fff9c4
+    style SelectModel fill:#ffccbc
+    style CompareThreshold fill:#ffccbc
+    style NewFace fill:#dcedc8
+    style FoundMatch fill:#ffcdd2
+```
+
+## Face Finding Process Flow
+
+This diagram illustrates the complete flow from when a user clicks the "Find Faces" button to when faces are displayed in the UI.
+
+### Key Decision Points:
+
+1. **AutoSwap Check**: Determines whether to clear existing faces and automatically swap
+2. **Alpha Channel Check**: Handles images with transparency
+3. **Auto Rotation Check**: Determines if multiple orientations should be tested
+4. **Model Selection**: Chooses appropriate face detection model
+5. **Similarity Threshold**: Determines if a face is new or matches existing
+
+### Process Stages:
+
+1. **Image Preparation**: Convert and format the input image
+2. **Face Detection**: Find faces using selected AI model
+3. **Face Recognition**: Extract embeddings for each face
+4. **Similarity Matching**: Compare with existing faces
+5. **UI Update**: Display new faces in the canvas
+
+### Parameters Affecting Flow:
+
+- **AutoSwapTextSel**: Controls initial flow path
+- **AutoRotationSwitch**: Affects detection angles
+- **DetectTypeTextSel**: Selects detection model
+- **DetectScoreSlider**: Filters detection confidence
+- **ThresholdSlider**: Controls face grouping sensitivity

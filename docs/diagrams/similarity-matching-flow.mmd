@@ -1,0 +1,143 @@
+```mermaid
+flowchart TB
+    Start([New Face Detected]) --> GetEmbedding[Get Face Embedding]
+    
+    GetEmbedding --> CheckExisting{Any Existing Faces?}
+    
+    CheckExisting -->|No| AddNewFace[Add as First Face]
+    CheckExisting -->|Yes| InitLoop[Initialize Comparison Loop]
+    
+    InitLoop --> ForEachFace{For Each Existing Face}
+    
+    ForEachFace --> GetStoredEmb[Get Stored Embedding]
+    
+    GetStoredEmb --> CalcCosine[["Calculate Cosine Similarity:
+    1. Flatten vectors (ravel)
+    2. Compute dot product
+    3. Normalize by vector magnitudes
+    4. cos_dist = 1 - (v1·v2)/(||v1||×||v2||)"]]
+    
+    CalcCosine --> ConvertScale[["Convert to 0-100 Scale:
+    similarity = 100 - cos_dist × 50
+    
+    Raw cosine: 0 = identical, 2 = opposite
+    Converted: 100 = identical, 0 = different"]]
+    
+    ConvertScale --> CompareThreshold{Similarity >= Threshold?}
+    
+    CompareThreshold -->|Yes| FoundMatch[["Match Found:
+    • Mark as same person
+    • Update embedding (optional)
+    • Increment match count"]]
+    
+    CompareThreshold -->|No| NextFace{More Faces to Check?}
+    
+    FoundMatch --> BreakLoop[Break from Loop]
+    
+    NextFace -->|Yes| ForEachFace
+    NextFace -->|No| NoMatch[No Match Found]
+    
+    NoMatch --> AddNewFace
+    
+    AddNewFace --> CreateFaceEntry[["Create Face Entry:
+    • Store embedding
+    • Create UI button
+    • Set button state = False
+    • Resize image to 82×82
+    • Create PhotoImage"]]
+    
+    CreateFaceEntry --> AddToUI[["Add to UI:
+    • Configure button
+    • Set click handler
+    • Add to canvas at position
+    • Update scroll region"]]
+    
+    BreakLoop --> UpdateExisting[["Update Existing Face:
+    • Optionally average embeddings
+    • Update match statistics
+    • Keep UI unchanged"]]
+    
+    AddToUI --> End([Matching Complete])
+    UpdateExisting --> End
+    
+    style Start fill:#e1f5fe
+    style End fill:#c8e6c9
+    style CheckExisting fill:#fff9c4
+    style CompareThreshold fill:#ffccbc
+    style FoundMatch fill:#dcedc8
+    style NoMatch fill:#ffcdd2
+```
+
+## Similarity Matching Process Flow
+
+This diagram illustrates how face embeddings are compared to determine if faces match.
+
+### Core Algorithm:
+
+1. **Cosine Distance Calculation**:
+   ```python
+   cos_dist = 1 - np.dot(v1, v2)/(np.linalg.norm(v1)*np.linalg.norm(v2))
+   ```
+   - Measures angular distance between embedding vectors
+   - Range: 0 (identical) to 2 (opposite)
+
+2. **Scale Conversion**:
+   ```python
+   similarity = 100 - cos_dist * 50
+   ```
+   - Converts to intuitive 0-100 scale
+   - 100 = identical faces
+   - 0 = completely different
+
+3. **Threshold Application**:
+   - User-defined threshold (default: 55)
+   - Higher threshold = stricter matching
+   - Lower threshold = looser matching
+
+### Key Decision Points:
+
+1. **Initial Check**: Are there any existing faces to compare?
+2. **Similarity Check**: Does similarity exceed threshold?
+3. **Loop Control**: Continue checking or stop on first match?
+
+### Face Grouping Logic:
+
+- **Match Found**: Face belongs to existing person
+  - No new UI button created
+  - Existing face data updated
+  - Prevents duplicate entries
+
+- **No Match**: Face is new person
+  - Creates new face entry
+  - Adds button to UI
+  - Expands found faces list
+
+### Design Rationale:
+
+1. **Why Cosine Similarity?**
+   - Embeddings are normalized vectors
+   - Angle matters more than magnitude
+   - Industry standard for face matching
+
+2. **Why 0-100 Scale?**
+   - More intuitive than 0-2 range
+   - Percentage-like interpretation
+   - Easier threshold setting
+
+3. **Why Single Threshold?**
+   - Simple user control
+   - Balances accuracy vs coverage
+   - Prevents over-complication
+
+### Threshold Effects:
+
+- **Low (0-40)**: Groups many faces together, may merge different people
+- **Medium (40-70)**: Balanced approach, good for most use cases
+- **High (70-100)**: Very strict, may split same person into multiple entries
+
+### Performance Considerations:
+
+- O(n) complexity for n existing faces
+- Early exit on first match
+- Efficient vector operations
+- Minimal UI updates

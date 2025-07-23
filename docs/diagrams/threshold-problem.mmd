@@ -1,0 +1,96 @@
+```mermaid
+flowchart TB
+    subgraph "Scenario: Family Photo with 4 People"
+        subgraph "Ground Truth"
+            DAD[Dad]
+            SON[Son<br/>looks like Dad]
+            MOM[Mom] 
+            DAUGHTER[Daughter]
+        end
+    end
+
+    subgraph "Frame 1: Good Lighting"
+        F1_DAD[Face 1<br/>Dad]
+        F1_SON[Face 2<br/>Son]
+        F1_MOM[Face 3<br/>Mom]
+        F1_DAUGHTER[Face 4<br/>Daughter]
+        
+        F1_DAD -.->|Similarity: 75| F1_SON
+        F1_MOM -.->|Similarity: 45| F1_DAUGHTER
+    end
+
+    subgraph "Frame 30: Dad Smiling"
+        F30_DAD[Face ?<br/>Dad smiling]
+        F30_SON[Face ?<br/>Son] 
+        F30_MOM[Face ?<br/>Mom]
+        F30_DAUGHTER[Face ?<br/>Daughter]
+        
+        F30_DAD -.->|Similarity: 65<br/>to F1_DAD| F1_DAD
+        F30_DAD -.->|Similarity: 72<br/>to F1_SON| F1_SON
+    end
+
+    subgraph "What Happens with Threshold = 70"
+        T70_1[Frame 1: ✓ 4 people found correctly]
+        T70_2[Frame 30: ❌ Dad assigned to Son's ID<br/>because 72 > 70 and checked first]
+        T70_3[Frame 30: ❌ Son becomes 'new person' #5]
+        T70_4[Result: 5 people found instead of 4]
+    end
+
+    subgraph "What Happens with Threshold = 80"  
+        T80_1[Frame 1: ✓ 4 people found correctly]
+        T80_2[Frame 30: ❌ Dad is 'new person' #5<br/>because 65 < 80]
+        T80_3[Frame 30: ❌ Son stays as person #2]
+        T80_4[Result: 5 people found, Dad split in two]
+    end
+
+    subgraph "The Impossible Choice"
+        PROB[To keep Dad consistent: Need threshold ≤ 65<br/>To separate Dad from Son: Need threshold ≥ 75<br/>Cannot satisfy both: 65 ≤ threshold ≥ 75]
+    end
+
+    F30_DAD ==>|First match wins| T70_2
+    F30_DAD ==>|No match found| T80_2
+
+    style F1_DAD fill:#ff9999
+    style F30_DAD fill:#ff6666
+    style F1_SON fill:#ffcc99
+    style F30_SON fill:#ffaa77
+    style PROB fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+```
+
+## The Real Problem: Context-Blind Matching
+
+This diagram shows a concrete scenario where the single threshold approach fails:
+
+### The Scenario:
+- Family of 4 people
+- Dad and Son look similar (genetic similarity)
+- Frame 1: Normal expressions
+- Frame 30: Dad is smiling (changes his embedding)
+
+### The Conflict:
+When Dad smiles in Frame 30, his face embedding changes. Now the system must decide:
+- Is this the same Dad from Frame 1? (Similarity: 65)
+- Or is this actually the Son? (Similarity: 72)
+
+### Why Both Thresholds Fail:
+
+**Threshold = 70:**
+- Dad's smiling face (72) is more similar to Son than to himself (65)
+- System assigns Dad to Son's ID (wrong person)
+- Son becomes a "new person"
+- Result: 5 people detected instead of 4
+
+**Threshold = 80:**
+- Dad's smiling face (65) too different from himself
+- System creates new person for smiling Dad
+- Result: Dad split into 2 different people
+
+### The Fundamental Flaw:
+
+The system makes decisions based ONLY on similarity scores, ignoring:
+- Spatial context (Dad is in same position)
+- Temporal context (gradual expression change)
+- Logical constraints (one person can't be in two places)
+- Prior knowledge (family members look similar)
+
+This is why multiple face swaps fail - the algorithm has no way to resolve these contradictions with a single threshold.

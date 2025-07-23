@@ -1,0 +1,95 @@
+```mermaid
+flowchart TB
+    subgraph "Initial State: 2 Similar People"
+        INIT[["Known Faces:
+        • Face A (Person 1)
+        • Face B (Person 2)
+        
+        Similarity(A,B) = 75"]]
+    end
+
+    subgraph "New Frame: Person 1 Changed Expression"
+        NEW[["New Detection: Face C
+        (Actually Person 1 with different expression)
+        
+        Similarity(C,A) = 65
+        Similarity(C,B) = 72"]]
+    end
+
+    subgraph "Current Algorithm (Threshold = 70)"
+        START[Face C Detected] --> LOOP[For each known face...]
+        
+        LOOP --> CHECK_A{Compare with Face A}
+        CHECK_A -->|Similarity: 65| FAIL_A[65 < 70 ❌]
+        
+        FAIL_A --> CHECK_B{Compare with Face B}
+        CHECK_B -->|Similarity: 72| MATCH_B[72 ≥ 70 ✓]
+        
+        MATCH_B --> ASSIGN[ASSIGN C to Person 2]
+        ASSIGN --> WRONG[["❌ WRONG: Person 1 is now
+        identified as Person 2"]]
+        
+        style WRONG fill:#ff6666,color:#fff
+    end
+
+    subgraph "Why This Happens"
+        WHY[["The algorithm:
+        1. Checks faces in order (A, then B)
+        2. Takes FIRST match above threshold
+        3. Ignores that C is MORE similar to A than B usually is
+        4. Has no concept that 'people don't teleport'
+        5. Can't use the fact that B is probably still B in the frame"]]
+    end
+
+    subgraph "The Core Problem"
+        CORE[["We're asking: 'Is similarity ≥ threshold?'
+        
+        We should ask: 'Which assignment makes most sense given:
+        - All similarities
+        - Spatial positions  
+        - Temporal continuity
+        - Physical constraints'"]]
+        
+        style CORE fill:#ffffcc,stroke:#ff9900,stroke-width:3px
+    end
+```
+
+## Algorithm Failure Demonstration
+
+This shows exactly HOW the algorithm fails, step by step.
+
+### The Problem:
+We're using a **greedy, order-dependent algorithm** that asks the wrong question.
+
+### What the Algorithm Does:
+```python
+for known_face in existing_faces:
+    if similarity(new_face, known_face) >= threshold:
+        return known_face  # FIRST MATCH WINS
+```
+
+### Why This Fails:
+1. **Order Matters**: If faces are checked in different order, results change
+2. **First Match Wins**: Better matches later in the list are never considered  
+3. **No Global View**: Can't see that assignment creates logical impossibilities
+4. **Binary Decision**: Either matches or doesn't - no nuance
+
+### What It Should Do:
+```python
+# Consider ALL possibilities
+assignments = generate_all_possible_assignments(new_faces, known_faces)
+
+# Score each based on multiple factors
+for assignment in assignments:
+    score = (
+        similarity_score(assignment) +
+        spatial_consistency_score(assignment) +
+        temporal_consistency_score(assignment) +
+        constraint_satisfaction_score(assignment)
+    )
+
+# Choose the BEST overall assignment
+return best_assignment
+```
+
+The current approach is like trying to solve a jigsaw puzzle by looking at one piece at a time and jamming it into the first spot that seems close enough.

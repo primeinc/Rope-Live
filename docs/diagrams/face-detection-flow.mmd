@@ -1,0 +1,124 @@
+```mermaid
+flowchart TB
+    Start([run_detect Called]) --> InitParams[Initialize Parameters]
+    
+    InitParams --> ParseParams[["Parse Parameters:
+    • detect_mode
+    • max_num
+    • score threshold
+    • rotation_angles"]]
+    
+    ParseParams --> SelectDetector{Select Detector}
+    
+    SelectDetector -->|Retinaface| LoadRetina[Load det_10g.onnx]
+    SelectDetector -->|SCRDF| LoadSCRDF[Load scrfd_2.5g_bnkps.onnx]
+    SelectDetector -->|Yolov8| LoadYolo[Load yoloface_8n.onnx]
+    SelectDetector -->|Yunet| LoadYunet[Load yunet_n_640_640.onnx]
+    
+    LoadRetina --> CallDetect[detect_retinaface()]
+    LoadSCRDF --> CallDetect2[detect_scrdf()]
+    LoadYolo --> CallDetect3[detect_yoloface()]
+    LoadYunet --> CallDetect4[detect_yunet()]
+    
+    CallDetect --> ForEachAngle
+    CallDetect2 --> ForEachAngle
+    CallDetect3 --> ForEachAngle
+    CallDetect4 --> ForEachAngle
+    
+    ForEachAngle{For Each Rotation Angle}
+    ForEachAngle --> RotateImage[Rotate Image by Angle]
+    
+    RotateImage --> PreprocessImage[["Preprocess Image:
+    • Resize to model input size
+    • Normalize pixel values
+    • Convert to model format"]]
+    
+    PreprocessImage --> RunInference[Run Model Inference]
+    
+    RunInference --> DecodeOutput[["Decode Model Output:
+    • Extract bounding boxes
+    • Extract confidence scores
+    • Extract landmarks"]]
+    
+    DecodeOutput --> FilterByScore{Score > Threshold?}
+    
+    FilterByScore -->|Yes| AddToResults[Add to Detection Results]
+    FilterByScore -->|No| DiscardDetection[Discard Low Confidence]
+    
+    AddToResults --> CheckMaxFaces{Results > max_num?}
+    DiscardDetection --> NextAngle
+    
+    CheckMaxFaces -->|Yes| SortByScore[Sort by Confidence Score]
+    CheckMaxFaces -->|No| NextAngle{More Angles?}
+    
+    SortByScore --> KeepTopN[Keep Top N Faces]
+    KeepTopN --> NextAngle
+    
+    NextAngle -->|Yes| ForEachAngle
+    NextAngle -->|No| CheckLandmarks{Use Landmark Detection?}
+    
+    CheckLandmarks -->|Yes| RunLandmarkDetection[run_detect_landmark()]
+    CheckLandmarks -->|No| ReturnResults
+    
+    RunLandmarkDetection --> EnhanceLandmarks[["Enhance Landmarks:
+    • 68-point detection
+    • 98-point detection
+    • 106-point detection
+    • 203-point detection"]]
+    
+    EnhanceLandmarks --> ReturnResults[["Return:
+    • Bounding boxes
+    • 5-point landmarks
+    • Extended landmarks"]]
+    
+    ReturnResults --> End([Detection Complete])
+    
+    style Start fill:#e1f5fe
+    style End fill:#c8e6c9
+    style SelectDetector fill:#fff9c4
+    style FilterByScore fill:#ffccbc
+    style CheckMaxFaces fill:#ffccbc
+    style CheckLandmarks fill:#fff9c4
+```
+
+## Face Detection Process Flow
+
+This diagram details the face detection subprocess within the face finding pipeline.
+
+### Key Components:
+
+1. **Model Selection**:
+   - **Retinaface** (det_10g.onnx): High accuracy, default choice
+   - **SCRDF** (scrfd_2.5g_bnkps.onnx): Faster alternative
+   - **Yolov8** (yoloface_8n.onnx): Modern architecture
+   - **Yunet** (yunet_n_640_640.onnx): Lightweight option
+
+2. **Rotation Processing**:
+   - Processes each rotation angle independently
+   - Angles: [0°, 90°, 180°, 270°] if AutoRotation enabled
+   - Only 0° if AutoRotation disabled
+
+3. **Score Filtering**:
+   - Each detection has a confidence score
+   - Only keeps detections above threshold
+   - Threshold from DetectScoreSlider (1-100)
+
+4. **Face Limiting**:
+   - Sorts all detections by confidence
+   - Keeps only top N faces (MaxFacesSlider)
+   - Prevents performance issues
+
+5. **Landmark Enhancement**:
+   - Optional advanced landmark detection
+   - Multiple landmark models available
+   - Provides detailed facial keypoints
+
+### Parameters Affecting Detection:
+
+- **DetectTypeTextSel**: Chooses detection model
+- **DetectScoreSlider**: Minimum confidence threshold
+- **MaxFacesSlider**: Maximum faces to detect
+- **AutoRotationSwitch**: Enable multi-angle detection
+- **LandmarksDetectionAdjSwitch**: Enable enhanced landmarks
+- **LandmarksDetectTypeTextSel**: Landmark model selection
+- **LandmarksDetectScoreSlider**: Landmark confidence threshold
